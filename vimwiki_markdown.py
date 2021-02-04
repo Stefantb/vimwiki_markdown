@@ -313,15 +313,28 @@ def setup_markdown_converter(options, src_file_dir: Path, dst_dir: Path) -> mark
 #******************************************************************************
 #
 #******************************************************************************
-def try_read_html_template(tpl_dir: Path, tpl_name: str, tpl_ext: str) -> Optional[str]:
+def try_read_html_template(tpl_dir: Path,
+                           tpl_default_name: str,
+                           tpl_ext: str,
+                           tpl_requested_name: Optional[str]) -> Optional[str]:
     template = None
-    template_file = tpl_dir / Path(tpl_name + tpl_ext)
 
-    if template_file.is_file():
-        with open(template_file, 'r') as f:
+    tpl_file = tpl_dir / Path(tpl_default_name + tpl_ext)
+
+    if tpl_requested_name:
+        req_tpl_file = tpl_dir / Path(tpl_requested_name + tpl_ext)
+        if req_tpl_file.is_file():
+            tpl_file = req_tpl_file
+        else:
+            eprint(f'markdown requested template {req_tpl_file} is not a file!')
+            eprint(f'falling back to wimwiki default: {tpl_file}.')
+
+    if tpl_file.is_file():
+        with open(tpl_file, 'r') as f:
             template = f.read()
     else:
-        eprint(f'{template_file} is not a file!')
+        eprint(f'{tpl_file} is not a file!')
+        eprint(f'falling back to internal default.')
 
     return template
 
@@ -341,7 +354,9 @@ def apply_defaults(root_path: Path) -> str:
 #******************************************************************************
 #
 #******************************************************************************
-def process_input_file(md: markdown.Markdown, input_file: Path, rel_root_path: str) -> Tuple[Dict[str, str], str]:
+def process_input_file(md: markdown.Markdown,
+                       input_file: Path,
+                       rel_root_path: str) -> Tuple[Dict[str, str], str]:
     placeholders = {
         '%root_path%': rel_root_path,
         '%title%':     input_file.stem,
@@ -453,12 +468,13 @@ def main():
 
     md = setup_markdown_converter(options, args.input_file.parent, args.output_dir)
 
-    placeholders, template = process_input_file(md, args.input_file, rel_root_path)
+    placeholders, requested_template = process_input_file(md, args.input_file, rel_root_path)
 
     template = try_read_html_template(
             args.template_path,
             args.template_default,
-            args.template_ext
+            args.template_ext,
+            requested_template
     ) or apply_defaults(root_path)
 
     html = render_template(template, placeholders)
