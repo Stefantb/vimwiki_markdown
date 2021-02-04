@@ -4,7 +4,12 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
-vimwiki-markdown = {editable = true,path = "."}
+vimwiki-markdown = {path = "."}
+e = "*"
+pylint = "*"
+markdown = "*"
+jedi = "*"
+rope = "*"
 
 [packages]
 
