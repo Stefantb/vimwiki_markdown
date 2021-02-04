@@ -9,7 +9,7 @@ import sys
 import json
 import textwrap
 import markdown
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 from pathlib import Path
 
 
@@ -201,7 +201,6 @@ img {
 """
 
 
-
 #******************************************************************************
 #
 #******************************************************************************
@@ -220,20 +219,11 @@ def copy_if_newer(src, dst):
 
 
 #******************************************************************************
-# what an idea to get to the config values
-#******************************************************************************
-# vim = shutil.which("vim") and "vim" or (shutil.which("nvim") and "nvim")
 #
-# if vim:
-#     # Retrieve auto index vimwiki option
-#     with subprocess.Popen(
-#         [vim, "-c", "echo g:vimwiki_dir_link", "-c", ":q", "--headless"],
-#         stdout=subprocess.PIPE,
-#         stderr=subprocess.PIPE,
-#     ) as proc:
-#         auto_index = proc.stderr.read() == b"index"
-# else:
-#     auto_index = False
+#******************************************************************************
+def write_to_file(output_file: Path, content: str):
+    with open(output_file, 'w') as o:
+        o.write(content)
 
 
 #******************************************************************************
@@ -245,15 +235,14 @@ class LinkInlineProc(markdown.inlinepatterns.LinkInlineProcessor):
     def __init__(self, *args, auto_index, **kwargs):
         super(LinkInlineProc, self).__init__(*args, **kwargs)
         self.auto_index = auto_index
-        # print(f'auto index: {auto_index}')
 
     def getLink(self, *args, **kwargs):
         href, title, index, handled = super().getLink(*args, **kwargs)
-        if not href.startswith("http") and not href.endswith(".html"):
-            if self.auto_index and href.endswith("/"):
-                href += "index.html"
-            elif not href.endswith("/"):
-                href += ".html"
+        if not href.startswith('http') and not href.endswith('.html'):
+            if self.auto_index and href.endswith('/'):
+                href += 'index.html'
+            elif not href.endswith('/'):
+                href += '.html'
         return href, title, index, handled
 
 
@@ -283,10 +272,10 @@ class ImageInlineProc(markdown.inlinepatterns.ImageInlineProcessor):
 #******************************************************************************
 #
 #******************************************************************************
-def setup_markdown_parser(options, src_file_dir: Path, dst_dir: Path) -> markdown.Markdown:
-    extensions = ["fenced_code", "tables","codehilite"]
+def setup_markdown_converter(options, src_file_dir: Path, dst_dir: Path) -> markdown.Markdown:
+    extensions = ['fenced_code', 'tables','codehilite']
     if 'markdown_extensions' in options:
-        extensions += options['markdown_extensions'].split(",")
+        extensions += options['markdown_extensions'].split(',')
     extensions = set([e for e in extensions if e])
 
     md = markdown.Markdown(extensions=extensions)
@@ -295,7 +284,7 @@ def setup_markdown_parser(options, src_file_dir: Path, dst_dir: Path) -> markdow
             markdown.inlinepatterns.LINK_RE,
             md,
             auto_index=options.get('auto_index', False)
-        ), "link", 160
+        ), 'link', 160
     )
     if options.get('copy_images', True):
         md.inlinePatterns.register(
@@ -304,7 +293,7 @@ def setup_markdown_parser(options, src_file_dir: Path, dst_dir: Path) -> markdow
                 md,
                 src_file_dir=src_file_dir,
                 output_dir=dst_dir
-            ), "image", 160
+            ), 'image', 160
         )
     return md
 
@@ -312,13 +301,13 @@ def setup_markdown_parser(options, src_file_dir: Path, dst_dir: Path) -> markdow
 #******************************************************************************
 #
 #******************************************************************************
-def read_html_template(tpl_dir: Path, tpl_name: str, tpl_ext: str) -> str:
+def try_read_html_template(tpl_dir: Path, tpl_name: str, tpl_ext: str) -> Optional[str]:
     template = None
     template_file = tpl_dir / Path(tpl_name + tpl_ext)
 
     if template_file.is_file():
-        with open(template_file, "rb") as f:
-            template = f.read().decode()
+        with open(template_file, 'r') as f:
+            template = f.read()
     else:
         eprint(f'{template_file} is not a file!')
 
@@ -328,37 +317,42 @@ def read_html_template(tpl_dir: Path, tpl_name: str, tpl_ext: str) -> str:
 #******************************************************************************
 #
 #******************************************************************************
+def apply_defaults(root_path: Path) -> str:
+    # lets write out the default stylesheet as well
+    dst = root_path / 'css/default_style.css'
+    Path(dst.parent).mkdir(parents=True, exist_ok=True)
+    write_to_file(dst, default_css)
+
+    return default_template
+
+
+#******************************************************************************
+#
+#******************************************************************************
 def process_input_file(md: markdown.Markdown, input_file: Path, rel_root_path: str) -> Tuple[Dict[str, str], str]:
-    placeholders = {}
+    placeholders = {
+        '%root_path%': rel_root_path,
+        '%title%':     input_file.stem,
+        '%date%':      datetime.datetime.today().strftime( '%Y-%m-%d')
+    }
+
     template = None
-    with open(input_file, "rb") as f:
-        content = ""
+    with open(input_file, 'r') as f:
+        content = ''
         # Retrieve vimwiki placeholders
         for line in f:
-            line = line.decode()[:-1]
-            if line.startswith("%nohtml"):
+            if line.startswith('%nohtml'):
                 sys.exit(0)
-            elif line.startswith("%title"):
-                placeholders["%title%"] = line[7:]
-            elif line.startswith("%date"):
-                placeholders["%date%"] = line[6:]
-            elif line.startswith("%template"):
-                template = line[10:]
+            elif line.startswith('%title'):
+                placeholders['%title%'] = line[7:-1]
+            elif line.startswith('%date'):
+                placeholders['%date%'] = line[6:-1]
+            elif line.startswith('%template'):
+                template = line[10:-1]
             else:
-                content += line + "\n"
+                content += line
 
         placeholders['%content%'] =  md.convert(content)
-
-    # Add values.
-    placeholders['%root_path%'] = rel_root_path
-
-    # Set default values
-    if "%title%" not in placeholders:
-        placeholders["%title%"] = input_file.stem
-    if "%date%" not in placeholders:
-        placeholders["%date%"] = datetime.datetime.today().strftime(
-            "%Y-%m-%d"
-        )
 
     return (placeholders, template)
 
@@ -373,22 +367,10 @@ def copy_css(root_path: Path, options: Dict):
         src = Path(src_dst[0])
         dst = root_path
         if len(src_dst) > 1:
-            dst = dst / src_dst[1]
+            dst = root_path / src_dst[1]
 
-        if dst.is_dir():
-            dst.mkdir(parents=True, exist_ok=True)
-        else:
-            Path(dst.parent).mkdir(parents=True, exist_ok=True)
-
+        Path(dst.parent).mkdir(parents=True, exist_ok=True)
         copy_if_newer(src, dst)
-
-
-#******************************************************************************
-#
-#******************************************************************************
-def write_html(html: str, output_file: Path):
-    with open(output_file, "wb") as o:
-        o.write(html.encode())
 
 
 #******************************************************************************
@@ -444,41 +426,32 @@ def main():
 
     args = parser.parse_args()
 
-    rel_root_path = args.root_path if args.root_path != "-" else ""
+    rel_root_path = args.root_path if args.root_path != '-' else ""
     root_path = args.output_dir / rel_root_path
-    output_file = args.output_dir / Path(args.input_file.stem + ".html")
+    output_file = args.output_dir / Path(args.input_file.stem + '.html')
 
     options = {}
     if args.options:
         options = json.loads(args.options)
 
     # Only markdown is supported
-    if args.syntax != "markdown":
-        eprint("Unsupported syntax: " + args.syntax)
+    if args.syntax != 'markdown':
+        eprint('Unsupported syntax: ' + args.syntax)
         sys.exit(1)
 
-    md = setup_markdown_parser(options, args.input_file.parent, args.output_dir)
+    md = setup_markdown_converter(options, args.input_file.parent, args.output_dir)
 
     placeholders, template = process_input_file(md, args.input_file, rel_root_path)
 
-    template = read_html_template(
+    template = try_read_html_template(
             args.template_path,
             args.template_default,
             args.template_ext
-    )
-
-    if template is None:
-        template = default_template
-
-        # lets copy out the default stylesheet as well
-        dst = root_path / 'css/default_style.css'
-        Path(dst.parent).mkdir(parents=True, exist_ok=True)
-        with open(dst, "wb") as o:
-            o.write(default_css.encode())
+    ) or apply_defaults(root_path)
 
     html = render_template(template, placeholders)
 
-    write_html(html, output_file)
+    write_to_file(output_file, html)
 
     copy_css(root_path, options)
 
@@ -486,20 +459,6 @@ def main():
 #******************************************************************************
 #
 #******************************************************************************
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
 
-
-# Example call from vimwiki
-# 0 ''/home/stefantb/.local/bin/vimwiki_markdown'',
-# 1 ''1'',
-# 2 ''markdown'',
-# 3 ''md'',
-# 4 ''/home/stefantb/vimwiki/site_html/'',
-# 5 ''/home/stefantb/Dropbox/Documents/Notes/workwiki/m2400-USB.md'',
-# 6 ''/home/stefantb/vimwiki/site_html/css/style.css'',
-# 7 ''/home/stefantb/Dropbox/Documents/Notes/workwiki/html/'',
-# 8 ''default'',
-# 9 ''.tpl'',
-# 10 ''-'',
-# 11 ''-'' 'custom_wiki2html_args'
