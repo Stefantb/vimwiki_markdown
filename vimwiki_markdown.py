@@ -117,17 +117,29 @@ code {
     font-family: Monaco,"Courier New","DejaVu Sans Mono","Bitstream Vera Sans Mono",monospace;
     -webkit-border-radius: 1px;
     -moz-border-radius: 1px;
-    border-radius: 1px;
+    border-radius: 6px;
     -moz-background-clip: padding;
     -webkit-background-clip: padding-box;
     background-clip: padding-box;
     padding: 0px 3px;
     display: inline-block;
     color: #e8e8e8;
+    border: 1px solid rgba(255, 255, 255, .1) !important;
 }
+
+code {
+    border-radius: 6px;
+    background-color: #3c2e2e;
+}
+.codehilite code {
+    border-radius: 1px;
+    background-color: #272822;
+}
+
 img {
     max-width: 80%;
 }
+
 .codehilite .hll { background-color: #49483e }
 .codehilite  { background: #272822; color: #f8f8f2 }
 .codehilite .c { color: #75715e } /* Comment */

@@ -152,7 +152,7 @@ The default theme provided is a dark theme and applies code highlighting with th
 
 The default theme and template can be triggered by specifying an invalid html template in your `vimrc`.
 
-For simplicity the [default template and css is defined in tahe source code](https://github.com/Stefantb/vimwiki_markdown/blob/master/vimwiki_markdown.py#L16-L201).
+For simplicity the [default template and css is defined in the source code](https://github.com/Stefantb/vimwiki_markdown/blob/master/vimwiki_markdown.py#L16-L213).
 
 ## Developing
 
